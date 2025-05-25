@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "55531643982",
+    "project_id": "clubverse-4141f",
+    "storage_bucket": "clubverse-4141f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:55531643982:android:842a21498628d9c2d68f1f",
+        "android_client_info": {
+          "package_name": "com.example.uniclub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0hU9cK5jfdj2XKh7JqU1M1kzoAIcvi8s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
