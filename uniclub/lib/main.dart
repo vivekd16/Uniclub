@@ -35,9 +35,9 @@ class ClubPortalApp extends StatelessWidget {
       title: 'College Club Portal',
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00695C)),
       ),
-      initialRoute: '/register',
+      initialRoute: '/',
       routes: {
         '/': (context) => const LoginScreen(),
         '/register': (context) => const StudentRegisterScreen(),
