@@ -1,0 +1,162 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function getUserRole() {
+      return getUserData().role;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserRole() == 'super_admin';
+    }
+    
+    function isCollegeAdmin() {
+      return isAuthenticated() && getUserRole() == 'college_admin';
+    }
+    
+    function isClubAdmin() {
+      return isAuthenticated() && getUserRole() == 'club_admin';
+    }
+    
+    function isStudent() {
+      return isAuthenticated() && getUserRole() == 'student';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function belongsToSameCollege(collegeId) {
+      return getUserData().collegeId == collegeId;
+    }
+    
+    function isClubMember(clubId) {
+      return getUserData().enrolledClubs.hasAny([clubId]);
+    }
+
+    // Users collection rules
+    match /users/{userId} {
+      // Allow users to read their own data
+      allow read: if isOwner(userId);
+      
+      // Allow users to update their own data (except role and collegeId)
+      allow update: if isOwner(userId) && 
+        !('role' in request.resource.data.diff(resource.data).affectedKeys()) &&
+        !('collegeId' in request.resource.data.diff(resource.data).affectedKeys());
+      
+      // Super admin can read/write all users
+      allow read, write: if isSuperAdmin();
+      
+      // College admin can read users from their college
+      allow read: if isCollegeAdmin() && belongsToSameCollege(resource.data.collegeId);
+      
+      // Club admin can read members of their club
+      allow read: if isClubAdmin() && 
+        getUserData().clubId != null &&
+        resource.data.enrolledClubs.hasAny([getUserData().clubId]);
+      
+      // Allow creation for registration
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Colleges collection rules
+    match /colleges/{collegeId} {
+      // Everyone can read college information
+      allow read: if isAuthenticated();
+      
+      // Super admin can create/update/delete colleges
+      allow write: if isSuperAdmin();
+      
+      // College admin can update their own college
+      allow update: if isCollegeAdmin() && 
+        belongsToSameCollege(collegeId) &&
+        getUserData().collegeId == collegeId;
+    }
+
+    // Clubs collection rules
+    match /clubs/{clubId} {
+      // Everyone can read club information
+      allow read: if isAuthenticated();
+      
+      // Super admin can do everything
+      allow write: if isSuperAdmin();
+      
+      // College admin can create/update/delete clubs in their college
+      allow write: if isCollegeAdmin() && 
+        belongsToSameCollege(resource.data.collegeId);
+      
+      // Club admin can update their own club
+      allow update: if isClubAdmin() && 
+        getUserData().clubId == clubId;
+      
+      // Students can update memberUids when joining/leaving clubs from their college
+      allow update: if isStudent() && 
+        belongsToSameCollege(resource.data.collegeId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'updatedAt']);
+    }
+
+    // Events collection rules
+    match /events/{eventId} {
+      // Everyone can read events
+      allow read: if isAuthenticated();
+      
+      // Super admin can do everything
+      allow write: if isSuperAdmin();
+      
+      // Club admin can create/update/delete events for their club
+      allow write: if isClubAdmin() && 
+        getUserData().clubId == resource.data.clubId;
+      
+      // College admin can manage events for clubs in their college
+      allow write: if isCollegeAdmin() && 
+        exists(/databases/$(database)/documents/clubs/$(resource.data.clubId)) &&
+        belongsToSameCollege(get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.collegeId);
+    }
+
+    // Chat rooms collection rules
+    match /chatRooms/{chatRoomId} {
+      // Only participants can read chat room info
+      allow read: if isAuthenticated() && 
+        resource.data.participants.hasAny([request.auth.uid]);
+      
+      // Club admin can create/update chat room for their club
+      allow write: if isClubAdmin() && 
+        getUserData().clubId == resource.data.clubId;
+      
+      // Super admin can do everything
+      allow write: if isSuperAdmin();
+      
+      // College admin can manage chat rooms for clubs in their college
+      allow write: if isCollegeAdmin() && 
+        exists(/databases/$(database)/documents/clubs/$(resource.data.clubId)) &&
+        belongsToSameCollege(get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.collegeId);
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        // Only chat room participants can read messages
+        allow read: if isAuthenticated() && 
+          get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.hasAny([request.auth.uid]);
+        
+        // Only chat room participants can create messages
+        allow create: if isAuthenticated() && 
+          get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participants.hasAny([request.auth.uid]) &&
+          request.resource.data.senderId == request.auth.uid;
+        
+        // Users can only update/delete their own messages
+        allow update, delete: if isAuthenticated() && 
+          resource.data.senderId == request.auth.uid;
+        
+        // Super admin can do everything
+        allow write: if isSuperAdmin();
+      }
+    }
+  }
+}
