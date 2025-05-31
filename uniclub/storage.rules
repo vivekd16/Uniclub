@@ -1,0 +1,80 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isValidImageFile() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    function isValidSize() {
+      return request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+
+    // Profile images - users can only upload their own
+    match /profile_images/{userId}.jpg {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+        isOwner(userId) && 
+        isValidImageFile() && 
+        isValidSize();
+    }
+
+    // Background images - users can only upload their own
+    match /background_images/{userId}.jpg {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+        isOwner(userId) && 
+        isValidImageFile() && 
+        isValidSize();
+    }
+
+    // College profile images - college admins and super admins can upload
+    match /college_profiles/{collegeId}.jpg {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+        isValidImageFile() && 
+        isValidSize();
+      // Note: Additional role-based checks should be done in the application layer
+    }
+
+    // College background images - college admins and super admins can upload
+    match /college_backgrounds/{collegeId}.jpg {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+        isValidImageFile() && 
+        isValidSize();
+    }
+
+    // Club profile images - club admins and college admins can upload
+    match /club_profiles/{clubId}.jpg {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+        isValidImageFile() && 
+        isValidSize();
+    }
+
+    // Club background images - club admins and college admins can upload
+    match /club_backgrounds/{clubId}.jpg {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+        isValidImageFile() && 
+        isValidSize();
+    }
+
+    // Event images - club admins can upload
+    match /event_images/{eventId}.jpg {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+        isValidImageFile() && 
+        isValidSize();
+    }
+  }
+}
